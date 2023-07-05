@@ -1,3 +1,5 @@
+from core.mps_autocast_stub import reassuring_symbol
+from core.mpt_device_map import mpt_device_map
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -38,6 +40,7 @@ def generate_batch_completion(
         skip_special_tokens=True,
         clean_up_tokenization_spaces=False,
     )
+    torch.mps.empty_cache()
 
     return [fix_indents(completion) for completion in batch_completions]
 
@@ -54,13 +57,15 @@ if __name__ == "__main__":
         use_auth_token=TOKEN,
     )
 
+    dmap = { key: 'mps' for key in mpt_device_map } if torch.backends.mps.is_available() else mpt_device_map
     model = torch.compile(
         AutoModelForCausalLM.from_pretrained(
             "sahil2801/replit-code-instruct-glaive",
-            torch_dtype=torch.bfloat16,
+            torch_dtype=torch.float16 if torch.backends.mps.is_available() else torch.bfloat16,
+            device_map=dmap,
             trust_remote_code=True,
             use_auth_token=TOKEN,
-            init_device="cuda",
+            init_device="meta",
         ).eval()
     )
 
